@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"regexp"
 
 	"golang.org/x/net/websocket"
 )
@@ -98,8 +99,42 @@ func write(ws *websocket.Conn) {
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
 		t := scanner.Text()
-		ws.Write([]byte(t))
-		fmt.Printf(">> %s\n", t)
+		// check for special command to send_file() which reads the file passed in as parameter and sends it as binary data
+		match, _ := regexp.MatchString("^send_file(", t)
+		if match {
+			//gets the file name and reads it into a byte array
+			re := regexp.MustCompile(`^send_file\(['"](.*?)['"]\)$`)
+			match := re.FindStringSubmatch(t)
+			filename := match[1]		
+		
+			file, err := os.Open(filename)
+
+	    if err != nil {
+	        log.Fatal(err)
+	    }
+	    defer file.Close()
+
+	    stats, statsErr := file.Stat()
+	    if statsErr != nil {
+	        log.Fatal(err)
+	    }
+
+	    var size int64 = stats.Size()
+	    data := make([]byte, size)
+
+	    bufr := bufio.NewReader(file)
+	    _,err = bufr.Read(data)
+
+			//sends the bytes over the websocket
+			ws.Write(data)
+			fmt.Printf(">> file %s sent\n", filename)
+			
+		} else {
+			//not the special command, send whatever was given
+			ws.Write([]byte(t))
+			fmt.Printf(">> %s\n", t)
+		}
+		
 	}
 }
 
