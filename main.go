@@ -100,7 +100,7 @@ func write(ws *websocket.Conn) {
 	for scanner.Scan() {
 		t := scanner.Text()
 		// check for special command to send_file() which reads the file passed in as parameter and sends it as binary data
-		match, _ := regexp.MatchString("^send_file(", t)
+		match, _ := regexp.MatchString(`^send_file\(`, t)
 		if match {
 			//gets the file name and reads it into a byte array
 			re := regexp.MustCompile(`^send_file\(['"](.*?)['"]\)$`)
@@ -110,12 +110,14 @@ func write(ws *websocket.Conn) {
 			file, err := os.Open(filename)
 
 	    if err != nil {
+					fmt.Printf(">> %s\n", err)
 	        log.Fatal(err)
 	    }
 	    defer file.Close()
 
 	    stats, statsErr := file.Stat()
 	    if statsErr != nil {
+					fmt.Printf(">> %s\n", err)
 	        log.Fatal(err)
 	    }
 
@@ -125,12 +127,19 @@ func write(ws *websocket.Conn) {
 	    bufr := bufio.NewReader(file)
 	    _,err = bufr.Read(data)
 
+	    if err != nil {
+					fmt.Printf(">> %s\n", err)
+	        log.Fatal(err)
+	    }
+
 			//sends the bytes over the websocket
-			ws.Write(data)
+			ws.PayloadType = websocket.BinaryFrame
+			ws.Write([]byte(data))
 			fmt.Printf(">> file %s sent\n", filename)
 			
 		} else {
 			//not the special command, send whatever was given
+			ws.PayloadType = websocket.TextFrame
 			ws.Write([]byte(t))
 			fmt.Printf(">> %s\n", t)
 		}
